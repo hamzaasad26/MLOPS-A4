@@ -5,7 +5,7 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main]
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch:
     inputs:
       reason:
         description: 'Trigger reason (e.g. drift detected, performance drop)'
@@ -14,7 +14,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: hamzaasad26/mlops-a4
 
 jobs:
   # ─────────────────────────────────────────
@@ -23,50 +23,38 @@ jobs:
   lint-and-test:
     name: "Stage 1: Lint & Unit Tests"
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
       - name: Install dependencies
-        run: |
-          pip install flake8 pytest pandas numpy scikit-learn
-
+        run: pip install flake8 pytest pandas numpy scikit-learn
       - name: Lint with flake8
-        run: |
-          flake8 data_processing/ --max-line-length=120 --ignore=E501,W503 || true
-
+        run: flake8 data_processing/ --max-line-length=120 --ignore=E501,W503 || true
       - name: Run unit tests
-        run: |
-          pytest tests/ -v --tb=short || true
+        run: pytest tests/ -v --tb=short || true
 
   data-validation:
     name: "Stage 1: Data Validation"
     runs-on: ubuntu-latest
     needs: lint-and-test
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
       - name: Install dependencies
-        run: |
-          pip install pandas numpy
-
+        run: pip install pandas numpy
       - name: Run data validation checks
-        run: |
-          python tests/data_validation.py
+        run: python tests/data_validation.py
 
   # ─────────────────────────────────────────
-  # STAGE 2: Build & Package Docker Images
+  # STAGE 2: Build & Package
   # ─────────────────────────────────────────
   build-training-image:
     name: "Stage 2: Build Training Docker Image"
@@ -75,19 +63,16 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push training image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/Dockerfile.training
@@ -101,19 +86,16 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push inference image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/Dockerfile.inference
@@ -128,23 +110,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-training-image, build-inference-image]
     if: github.ref == 'refs/heads/main'
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
       - name: Install KFP SDK
         run: pip install kfp==2.8.0
-
       - name: Compile pipeline
-        run: |
-          python pipeline/fraud_pipeline.py
-          echo "Pipeline compiled successfully"
-
+        run: python pipeline/fraud_pipeline.py
       - name: Log deployment
         run: |
           echo "✅ Pipeline compiled and ready for deployment"
@@ -153,37 +129,27 @@ jobs:
           echo "Triggered by: ${{ github.event_name }}"
 
   # ─────────────────────────────────────────
-  # STAGE 4: Intelligent Trigger
-  # Triggered by monitoring alerts (drift/performance)
+  # STAGE 4: Intelligent Retraining Trigger
   # ─────────────────────────────────────────
   intelligent-retrain:
     name: "Stage 4: Intelligent Retraining Trigger"
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
       - name: Install dependencies
-        run: |
-          pip install pandas numpy scikit-learn xgboost lightgbm imbalanced-learn category_encoders joblib
-
+        run: pip install pandas numpy scikit-learn xgboost lightgbm imbalanced-learn category_encoders joblib
       - name: Log trigger reason
         run: |
           echo "🚨 Intelligent retraining triggered!"
           echo "Reason: ${{ github.event.inputs.reason }}"
           echo "Timestamp: $(date)"
-
       - name: Simulate retraining
-        run: |
-          python tests/retrain_check.py
-
+        run: python tests/retrain_check.py
       - name: Log retraining complete
-        run: |
-          echo "✅ Retraining complete at $(date)"
-          echo "New model ready for evaluation and deployment"
+        run: echo "✅ Retraining complete at $(date)"
