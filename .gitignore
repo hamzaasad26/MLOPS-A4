@@ -1,0 +1,21 @@
+# Large data files
+ieee-fraud-detection/*.csv
+ieee-fraud-detection/*.zip
+ieee-fraud-detection/train_*
+ieee-fraud-detection/test_*
+ieee-fraud-detection/sample_*
+
+# Keep preprocessed and comparison files out too
+ieee-fraud-detection/preprocessed.csv
+
+# Model files (too large)
+models/*.pkl
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
